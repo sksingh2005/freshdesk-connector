@@ -1,0 +1,22 @@
+{
+  "name": "freshdesk-connector",
+  "version": "0.1.0",
+  "description": "Read-only Freshdesk connector for Agent Studio agents — list, get, and search tickets over MCP with API-key auth, pagination, and 429/Retry-After backoff.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "dotenv": "^16.4.5",
+    "zod": "^3.23.8"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test",
+    "seed": "node scripts/seed.js",
+    "demo": "node scripts/demo.js",
+    "tools:sync": "node scripts/sync-tools.js"
+  }
+}

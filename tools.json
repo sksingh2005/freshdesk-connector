@@ -1,0 +1,182 @@
+{
+  "server": "freshdesk-connector",
+  "transport": "stdio",
+  "readOnly": true,
+  "tools": [
+    {
+      "name": "list_tickets",
+      "description": "List Freshdesk tickets, most recent first. Optional status/priority filters are applied client-side; use search_tickets for server-side filtering. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "pending",
+              "resolved",
+              "closed"
+            ]
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "urgent"
+            ]
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1
+          },
+          "per_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20
+          }
+        }
+      },
+      "exampleCall": {
+        "status": "open",
+        "priority": "urgent",
+        "page": 1,
+        "per_page": 20
+      },
+      "exampleResponse": {
+        "items": [
+          {
+            "id": 123,
+            "subject": "Refund not received",
+            "status": "open",
+            "status_code": 2,
+            "priority": "high",
+            "priority_code": 3,
+            "created_at": "2026-10-01T09:30:00Z",
+            "updated_at": "2026-10-01T11:00:00Z",
+            "due_by": "2026-10-03T09:30:00Z",
+            "tags": [
+              "refund"
+            ],
+            "description_preview": "First 300 characters…"
+          }
+        ],
+        "page": 1,
+        "has_more": true
+      }
+    },
+    {
+      "name": "get_ticket",
+      "description": "Fetch one Freshdesk ticket by ID with its last 5 conversation entries (each truncated to 500 chars). Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "ticket_id"
+        ],
+        "properties": {
+          "ticket_id": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "exampleCall": {
+        "ticket_id": 123
+      },
+      "exampleResponse": {
+        "id": 123,
+        "subject": "Refund not received",
+        "status": "open",
+        "status_code": 2,
+        "priority": "high",
+        "priority_code": 3,
+        "created_at": "2026-10-01T09:30:00Z",
+        "updated_at": "2026-10-01T11:00:00Z",
+        "due_by": "2026-10-03T09:30:00Z",
+        "tags": [
+          "refund"
+        ],
+        "description_preview": "First 300 characters…",
+        "conversations": [
+          {
+            "id": 9,
+            "incoming": true,
+            "private": false,
+            "created_at": "2026-10-01T10:00:00Z",
+            "body": "Customer reply…"
+          }
+        ]
+      }
+    },
+    {
+      "name": "search_tickets",
+      "description": "Search Freshdesk tickets by status, priority, tag, and/or created_after date (AND-combined). The query string is built server-side; raw queries are not accepted. Max 10 pages (300 results). Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "pending",
+              "resolved",
+              "closed"
+            ]
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "urgent"
+            ]
+          },
+          "tag": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "created_after": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "default": 1
+          }
+        }
+      },
+      "exampleCall": {
+        "status": "open",
+        "tag": "refund",
+        "page": 1
+      },
+      "exampleResponse": {
+        "items": [
+          {
+            "id": 123,
+            "subject": "Refund not received",
+            "status": "open",
+            "status_code": 2,
+            "priority": "high",
+            "priority_code": 3,
+            "created_at": "2026-10-01T09:30:00Z",
+            "updated_at": "2026-10-01T11:00:00Z",
+            "due_by": "2026-10-03T09:30:00Z",
+            "tags": [
+              "refund"
+            ],
+            "description_preview": "First 300 characters…"
+          }
+        ],
+        "page": 1,
+        "has_more": false
+      }
+    }
+  ]
+}
