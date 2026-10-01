@@ -163,7 +163,8 @@ export class FreshdeskClient {
   /** List tickets. Returns { items, page, hasMore }. */
   async listTickets({ page = 1, perPage = 20, ...rest } = {}) {
     FreshdeskClient.validatePagination(page, perPage);
-    const data = await this.#request('/tickets', { page, per_page: perPage, ...rest });
+    // include=description: Freshdesk omits descriptions from list responses otherwise.
+    const data = await this.#request('/tickets', { page, per_page: perPage, include: 'description', ...rest });
     const items = Array.isArray(data) ? data : [];
     return { items, page, hasMore: items.length === perPage };
   }
@@ -173,6 +174,10 @@ export class FreshdeskClient {
     if (!Number.isInteger(id) || id <= 0) {
       throw new FreshdeskError('INVALID_INPUT', 'ticket_id must be a positive integer.');
     }
+    // Note: view accepts include=conversations; the combined
+    // include=conversations,description is rejected (HTTP 400), and the
+    // view response already carries the description. Only the list
+    // endpoint needs the explicit include (see listTickets).
     const params = includeConversations ? { include: 'conversations' } : {};
     const data = await this.#request(`/tickets/${id}`, params);
     // Some accounts embed conversations; others need the sub-resource. Both are GET.
