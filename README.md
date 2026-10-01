@@ -10,10 +10,23 @@ A read-only Freshdesk connector exposed as an MCP server over stdio. An Agent St
 ```bash
 cd freshdesk-connector
 npm install
-cp .env.example .env   # then set FRESHDESK_DOMAIN and FRESHDESK_API_KEY
+cp .env.example .env   # Windows: copy .env.example .env
+# then set FRESHDESK_DOMAIN and FRESHDESK_API_KEY
 ```
 
 `.env` is git-ignored. Commit `.env.example` only.
+
+## Environment variables
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `FRESHDESK_DOMAIN` | yes | — | Subdomain only (`acme`, not `acme.freshdesk.com`) |
+| `FRESHDESK_API_KEY` | yes | — | Key from Profile Settings → View API Key |
+| `FRESHDESK_BASE_URL` | no | `https://{domain}.freshdesk.com/api/v2` | Override for tests / local mock |
+| `REQUEST_TIMEOUT_MS` | no | `10000` | Per-request timeout (abort + `TIMEOUT`) |
+| `MAX_RETRIES` | no | `4` | Retries for 429 / 502 / 503 / 504 / network errors |
+
+Missing `FRESHDESK_DOMAIN` / `FRESHDESK_API_KEY` exits with an error naming the variable (never the secret).
 
 ## How to run
 
@@ -44,6 +57,31 @@ npm run tools:sync  # regenerate tools.json from src/tools.js
 ```
 
 For Agent Studio, keep the same shape but reference your secret store for `FRESHDESK_API_KEY`. All logs go to stderr so stdout stays clean for MCP framing.
+
+## Inspect interactively
+
+```bash
+npx @modelcontextprotocol/inspector node src/server.js
+```
+
+Open the printed URL, pick `list_tickets` / `get_ticket` / `search_tickets`, and call them. Needs `.env` with real credentials, or point `FRESHDESK_BASE_URL` at the mock via `npm run demo -- --mock` for an offline walkthrough.
+
+## Error catalog
+
+## Error catalog
+
+Tool handlers never return stack traces. Client error codes (`src/freshdeskClient.js`) map to short MCP messages (`src/tools.js`):
+
+| Code | Trigger | Agent-facing message |
+|---|---|---|
+| `AUTH_FAILED` | 401 / 403 | Authentication failed. Check FRESHDESK_API_KEY and FRESHDESK_DOMAIN. |
+| `NOT_FOUND` | 404 | Ticket not found. |
+| `RATE_LIMITED` | 429 retries exhausted | Rate limited. Retry after N seconds. |
+| `TIMEOUT` | Abort after `REQUEST_TIMEOUT_MS` | Freshdesk request timed out. Try again shortly. |
+| `INVALID_INPUT` | Bad page/per_page, bad ticket_id, bad filter | The specific validation message. |
+| `UPSTREAM_ERROR` | Other 4xx, 5xx exhausted, network down | Freshdesk is temporarily unavailable. Try again shortly. |
+
+Zod validation failures return `Invalid input: <path>: <reason>` the same way.
 
 ## Flow
 
@@ -76,6 +114,12 @@ Checked against https://developers.freshdesk.com/api/ (Oct 2026). Followed the d
 - **Why API key, not OAuth:** Freshdesk's agent API uses per-account API keys; OAuth per-merchant would be better (see CAPABILITIES.md) but is out of scope for this take-home and would add account-coupling complexity.
 - **Why trimmed output:** raw tickets carry requester emails, phones, and HTML bodies the agent does not need. `mappers.js` whitelists fields and masks email/phone patterns in free text, keeping payloads small and PII out of the model context.
 - **Why a mock server in tests:** `test/mockFreshdesk.js` is a controllable `node:http` server (normal page, last page, 404, 401, one-shot and permanent 429, one-shot 503, slow response). Tests run offline with `npm test` from a fresh clone and assert timing, retry counts, and header construction deterministically. No axios/jest/nock — built-in `fetch` and `node:test` only.
+
+## Unverified / not finished
+
+- No live Freshdesk trial run: seed (`npm run seed`) and real-account demo need your credentials; only mock + docs verified so far.
+- No interactive MCP Inspector session, only stdio boot + handler tests.
+- Merchant plan API access assumed per docs (trials include API; 403 surfaces as `AUTH_FAILED`).
 
 ## What is missing vs the Python DeskBridge
 
