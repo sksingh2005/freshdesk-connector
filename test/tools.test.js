@@ -85,4 +85,16 @@ describe('tools', () => {
     const q = buildSearchQuery({ status: 'open', priority: 'high', tag: 'refund', created_after: '2026-01-01' });
     assert.equal(q, '"status:2 AND priority:3 AND tag:\'refund\' AND created_at>\'2026-01-01\'"');
   });
+
+  it('tools.json examples validate against the live zod schemas', () => {
+    for (const spec of TOOL_SPECS) {
+      const tool = TOOLS.find((t) => t.name === spec.name);
+      const parsed = tool.schema.safeParse(spec.exampleCall);
+      assert.equal(parsed.success, true, `${spec.name} exampleCall fails zod schema: ${JSON.stringify(parsed.error?.issues)}`);
+    }
+    // Spot-check that invalid values fail the live schemas too.
+    const search = TOOLS.find((t) => t.name === 'search_tickets').schema;
+    assert.equal(search.safeParse({ status: 'bogus', page: 1 }).success, false);
+    assert.equal(search.safeParse({ page: 11 }).success, false);
+  });
 });
