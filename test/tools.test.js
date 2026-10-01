@@ -86,8 +86,14 @@ describe('tools', () => {
     assert.equal(q, '"status:2 AND priority:3 AND tag:\'refund\' AND created_at>\'2026-01-01\'"');
   });
 
-  it('tools.json examples validate against the live zod schemas', () => {
+  it('docs/TOOL_SPEC.md covers every tool in the spec', () => {
+    const specDoc = fs.readFileSync(path.join(__dirname, '..', 'docs', 'TOOL_SPEC.md'), 'utf8');
     for (const spec of TOOL_SPECS) {
+      assert.ok(specDoc.includes(`\`${spec.name}\``), `TOOL_SPEC.md missing ${spec.name}`);
+    }
+  });
+
+  it('tools.json examples validate against the live zod schemas', () => {    for (const spec of TOOL_SPECS) {
       const tool = TOOLS.find((t) => t.name === spec.name);
       const parsed = tool.schema.safeParse(spec.exampleCall);
       assert.equal(parsed.success, true, `${spec.name} exampleCall fails zod schema: ${JSON.stringify(parsed.error?.issues)}`);
