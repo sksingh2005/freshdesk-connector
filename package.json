@@ -14,7 +14,7 @@
   },
   "scripts": {
     "start": "node src/server.js",
-    "test": "node --test",
+    "test": "node --test test/*.test.js",
     "seed": "node scripts/seed.js",
     "demo": "node scripts/demo.js",
     "tools:sync": "node scripts/sync-tools.js"

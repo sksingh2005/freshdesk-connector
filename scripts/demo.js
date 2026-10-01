@@ -25,9 +25,9 @@ const section = (t) => console.log(`\n=== ${t} ===`);
 section('1. list_tickets — open + urgent (page 1, per_page 5)');
 {
   const { items, page, hasMore } = await client.listTickets({ page: 1, perPage: 5 });
-  const mapped = items.map(mapTicket).filter((t) => t.status === 'open' && (t.priority === 'urgent' || true)).slice(0, 5);
+  const mapped = items.map(mapTicket).filter((t) => t.status === 'open' && t.priority === 'urgent');
   console.log(JSON.stringify({ page, count: mapped.length, has_more: hasMore, items: mapped.slice(0, 2) }, null, 2));
-  console.log(`(showing 2 of ${mapped.length}; full list has ${items.length} raw items)`);
+  if (!mapped.length) console.log('(no open+urgent tickets on this page; try npm run seed on a real trial)');
 }
 
 section('2. search_tickets — tag "refund"');

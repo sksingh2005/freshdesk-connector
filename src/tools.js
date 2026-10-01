@@ -211,7 +211,7 @@ async function searchTicketsHandler(args) {
     const query = buildSearchQuery(input);
     const client = getToolsClient();
     const { items, page, hasMore } = await client.searchTickets({ query, page: input.page });
-    return ok({ items: items.map(mapTicket), page, has_more: hasMore, query });
+    return ok({ items: items.map(mapTicket), page, has_more: hasMore });
   } catch (err) {
     if (err?.name === 'ZodError') return mcpError(`Invalid input: ${err.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join('; ')}`);
     return mcpError(friendlyError(err));
