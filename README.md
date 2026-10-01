@@ -116,6 +116,16 @@ Checked against https://developers.freshdesk.com/api/ (Oct 2026). Followed the d
 - **Why trimmed output:** raw tickets carry requester emails, phones, and HTML bodies the agent does not need. `mappers.js` whitelists fields and masks email/phone patterns in free text, keeping payloads small and PII out of the model context.
 - **Why a mock server in tests:** `test/mockFreshdesk.js` is a controllable `node:http` server (normal page, last page, 404, 401, one-shot and permanent 429, one-shot 503, slow response). Tests run offline with `npm test` from a fresh clone and assert timing, retry counts, and header construction deterministically. No axios/jest/nock — built-in `fetch` and `node:test` only.
 
+## Assumptions and limitations
+
+Assumptions:
+- Node.js 18+ with network access to `*.freshdesk.com` over HTTPS.
+- One Freshdesk account per server instance (single domain + API key).
+- The API key belongs to an agent/admin with read permission on tickets (otherwise 403 → `AUTH_FAILED`).
+- Trial accounts include API access at ~50 calls/minute; plan limits are shared with all other API consumers on the account.
+
+Limitations (full list in `CAPABILITIES.md`): read-only (no create/reply/update/delete), no contacts/companies/attachments, no free-text search, max 300 search results per query, max 5 conversation entries per ticket, pattern-based (not guaranteed) PII masking, no caching, no webhooks (reads may lag writes by seconds to minutes), shared-key auth instead of per-merchant OAuth.
+
 ## Unverified / not finished
 
 - No live Freshdesk trial run: seed (`npm run seed`) and real-account demo need your credentials; only mock + docs verified so far.
