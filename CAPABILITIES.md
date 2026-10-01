@@ -6,7 +6,7 @@ Short document for the people who will give this connector to an agent.
 
 List, fetch, and search tickets in one Freshdesk account, filtered by status, priority, tag, and date:
 
-- `list_tickets`: paged recent tickets (`page`, `per_page` 1–100, default 20). Optional `status`/`priority` words filter the returned page client-side.
+- `list_tickets`: paged recent tickets (`page`, `per_page` 1–100, default 20). Optional `status`/`priority` words filter the returned page client-side (the Freshdesk list endpoint has no server-side filter for these — see README Verified API details).
 - `get_ticket`: one ticket by `ticket_id` plus its last 5 conversation entries (each truncated to 500 chars).
 - `search_tickets`: server-side filter by `status`, `priority`, exact `tag`, `created_after` (YYYY-MM-DD), and `page` (1–10). Clauses are AND-combined into a Freshdesk `query="..."` string built by the connector — the agent never sends raw query text.
 
@@ -41,6 +41,6 @@ All output is trimmed (`id, subject, status(+code), priority(+code), created_at,
 
 ## Security notes
 
-- Key lives in `FRESHDESK_API_KEY` (env/secret store only). `.env` is git-ignored; only `.env.example` is committed. Rotate immediately if the key appears in logs or git history (Freshdesk Profile Settings → revoke/reissue).
+- Key lives in `FRESHDESK_API_KEY` (env/secret store only). `FRESHDESK_BASE_URL` override exists for tests and the local mock — never point it at an untrusted host with a real key. `.env` is git-ignored; only `.env.example` is committed. Rotate immediately if the key appears in logs or git history (Freshdesk Profile Settings → revoke/reissue).
 - Logged per request: method, path, status, duration (stderr). Never logged: headers, query secrets, the API key, request/response bodies.
 - Seed data is fictional (`[FICTIONAL]` prefix, `fake.userNN@example.com`). No real customer data anywhere in the repo.
