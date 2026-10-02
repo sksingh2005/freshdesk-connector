@@ -3,7 +3,7 @@
 The MCP server connects to one Freshdesk account with one API key. Its three tools read tickets:
 
 - `list_tickets` returns one page of recent tickets. `status` and `priority` filter that fetched page locally, so a short or empty result does not mean there are no matches on later pages.
-- `get_ticket` returns one ticket by ID and up to five recent conversation entries. Each conversation body is truncated after 500 characters, with a truncation marker added.
+- `get_ticket` returns one ticket by ID and up to the last five conversation entries returned by Freshdesk. The connector does not sort them by time. Each conversation body is truncated after 500 characters, with a truncation marker added.
 - `search_tickets` combines the supplied status, priority, exact tag, and creation-date filters. At least one filter is required. Freshdesk search allows at most 10 pages of 30 results.
 
 The output includes ticket ID, subject, status and priority with their numeric codes, dates, tags, and a description preview. Structured requester contact fields are omitted. Common email and phone patterns are masked in descriptions and conversation bodies.

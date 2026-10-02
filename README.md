@@ -4,7 +4,7 @@ This read-only MCP server gives an agent three Freshdesk ticket tools: `list_tic
 
 ## Set up
 
-You need Node.js 18 or newer, a Freshdesk account with API access, its subdomain, and an API key with permission to read tickets.
+You need Node.js 18 or newer, a Freshdesk account with API access, its subdomain, and an API key with permission to read tickets. In Freshdesk, open your profile settings and select **View API Key** to find the key.
 
 ```bash
 cd freshdesk-connector
@@ -98,7 +98,3 @@ One server instance connects to one Freshdesk account. The key must have ticket 
 This connector cannot create or change tickets, read attachments or contact records, or run keyword search. Search is limited to 300 results per query; `get_ticket` returns at most five conversation entries. There is no cache, webhook listener, or per-agent audit log. See [CAPABILITIES.md](CAPABILITIES.md) for the full list.
 
 Local mock tests cover the client and tool handlers. This checkout has no recorded end-to-end Agent Studio run or full live Freshdesk demo of the Node.js connector. Run `npm run demo` and an MCP client session with a trial account before claiming those checks in a submission.
-
-## Relationship to DeskBridge
-
-DeskBridge is a separate Python implementation used as a reference. This Node.js project adds the GET-only method test, a `tools.json` sync test, and the output and configuration fields listed in the build brief. Submit one clearly identified project for the Freshdesk connector task.

@@ -56,7 +56,7 @@ A filtered page may be short or empty even when `has_more` is true, because late
 
 ## Tool: `get_ticket`
 
-Get one ticket by ID and up to five recent conversation entries.
+Get one ticket by ID and up to the last five conversation entries returned by Freshdesk. The connector does not sort them by time.
 
 Input schema:
 
