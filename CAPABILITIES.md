@@ -1,46 +1,33 @@
-# CAPABILITIES — freshdesk-connector
+# Agent capabilities
 
-Short document for the people who will give this connector to an agent.
+The MCP server connects to one Freshdesk account with one API key. Its three tools read tickets:
 
-## What the agent can do
+- `list_tickets` returns one page of recent tickets. `status` and `priority` filter that fetched page locally, so a short or empty result does not mean there are no matches on later pages.
+- `get_ticket` returns one ticket by ID and up to five recent conversation entries. Each conversation body is truncated after 500 characters, with a truncation marker added.
+- `search_tickets` combines the supplied status, priority, exact tag, and creation-date filters. At least one filter is required. Freshdesk search allows at most 10 pages of 30 results.
 
-List, fetch, and search tickets in one Freshdesk account, filtered by status, priority, tag, and date:
-
-- `list_tickets`: paged recent tickets (`page`, `per_page` 1–100, default 20). Optional `status`/`priority` words filter the returned page client-side (the Freshdesk list endpoint has no server-side filter for these — see README Verified API details).
-- `get_ticket`: one ticket by `ticket_id` plus its last 5 conversation entries (each truncated to 500 chars).
-- `search_tickets`: server-side filter by `status`, `priority`, exact `tag`, `created_after` (YYYY-MM-DD), and `page` (1–10). Clauses are AND-combined into a Freshdesk `query="..."` string built by the connector — the agent never sends raw query text.
-
-All output is trimmed (`id, subject, status(+code), priority(+code), created_at, updated_at, due_by, tags, description_preview`) with requester PII dropped and email/phone patterns masked in free text.
+The output includes ticket ID, subject, status and priority with their numeric codes, dates, tags, and a description preview. Structured requester contact fields are omitted. Common email and phone patterns are masked in descriptions and conversation bodies.
 
 ## What the agent cannot do
 
-- Create, update, reply to, assign, forward, merge, or delete tickets — no write code exists.
-- See contact or company records, knowledge-base articles, time entries, or satisfaction ratings.
-- Read attachments — not fetched or returned.
-- Access other Freshdesk accounts — one domain + key per server instance.
-- See requester personal details — emails, phones, names in structured fields are whitelisted out; free-text matches are masked, not guaranteed removed.
-- Run free-text/keyword search — only field-equality and date-range filters are exposed.
-- Return more than 300 search results per query (30/page × 10 pages) or more than 5 conversations per ticket in this connector.
+- Create, update, assign, reply to, forward, merge, or delete tickets.
+- Read attachments, contact or company records, knowledge-base articles, time entries, or satisfaction ratings.
+- Access another Freshdesk account through the same server instance.
+- Run keyword search or pass a raw Freshdesk search query.
+- Retrieve more than 300 search results for one query or more than five conversation entries for one ticket.
 
-## Known limitations
+Do not treat the output as free of personal data. Subject and tags are returned without masking. Pattern matching in descriptions and conversations can miss names, addresses, IDs, or unusual email and phone formats.
 
-- **API-key auth instead of OAuth:** one shared key for all agent calls. Rotation breaks every consumer at once; the rate limit is shared with any other API user on the account.
-- **No caching:** every tool call hits Freshdesk, spending rate-limit budget on repeated reads.
-- **No webhooks:** data may be seconds to minutes stale; there is no push on ticket updates.
-- **Freshdesk search page limits:** max 10 pages; broad queries must be narrowed.
-- **Shared rate limit:** 429s are retried (Retry-After capped at 60s, `MAX_RETRIES` default 4), but sustained overload fails cleanly with `RATE_LIMITED` rather than queueing.
-- **Masking is pattern-based:** catches common emails/phones, misses names, addresses, IDs, and unusual formats.
+## Operational limits
 
-## Long-term fixes (each tied to a limitation)
+The key is shared by all calls to this server. Other API consumers on the same Freshdesk account also use its rate-limit allowance. The client retries 429 responses using `Retry-After` when present, with each wait capped at 60 seconds. It stops after `MAX_RETRIES` additional attempts and returns `RATE_LIMITED` if the limit persists.
 
-- OAuth with per-merchant tokens in a secrets manager (fixes shared-key blast radius and enables per-merchant audit).
-- Short-TTL response cache (e.g. Redis) keyed by ticket ID/query hash, invalidated by Freshdesk webhooks (fixes repeat-read cost and staleness).
-- Webhook-driven sync into a local index for search (fixes 300-result ceiling and enables full-text search).
-- Per-agent audit log of tool, params, merchant, timestamp, stored apart from app logs (fixes accountability).
-- Merchant-configured field-level rules, e.g. unmasking requester email only for explicitly allowed queues (fixes all-or-nothing PII handling).
+Every tool call reads Freshdesk directly. There is no cache or webhook listener. Freshdesk search stops at page 10, and the connector does not maintain a local search index. Conversation fetching is best effort: a retryable failure can leave a successful ticket response without conversations.
 
-## Security notes
+## Security and future work
 
-- Key lives in `FRESHDESK_API_KEY` (env/secret store only). `FRESHDESK_BASE_URL` override exists for tests and the local mock — never point it at an untrusted host with a real key. `.env` is git-ignored; only `.env.example` is committed. Rotate immediately if the key appears in logs or git history (Freshdesk Profile Settings → revoke/reissue).
-- Logged per request: method, path, status, duration (stderr). Never logged: headers, query secrets, the API key, request/response bodies.
-- Seed data is fictional (`[FICTIONAL]` prefix, `fake.userNN@example.com`). No real customer data anywhere in the repo.
+Keep `FRESHDESK_API_KEY` in the process environment or a secret store. Do not commit `.env`. The `FRESHDESK_BASE_URL` override is for local tests; pointing it to an untrusted host would send the key there. Rotate the key if it appears in logs or Git history.
+
+Request logs on stderr contain the method, path, status, and duration. They do not include the key, authorization header, query values, or response bodies. The optional seed script creates fictional tickets and is separate from the read-only server.
+
+For deployment across merchants, add per-merchant credentials and access rules, a short-lived response cache, and an audit log tied to each agent call. Webhooks or a local index could reduce repeated reads and support search beyond Freshdesk's 300-result window.

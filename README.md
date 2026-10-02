@@ -1,45 +1,45 @@
-# freshdesk-connector
+# Freshdesk connector
 
-A read-only Freshdesk connector exposed as an MCP server over stdio. An Agent Studio agent gets three tools — `list_tickets`, `get_ticket`, `search_tickets` — to read merchant support tickets. The HTTP client only issues GET requests, authenticates with a Freshdesk API key, retries 429/5xx with backoff, and returns trimmed tickets with no requester PII.
+This read-only MCP server gives an agent three Freshdesk ticket tools: `list_tickets`, `get_ticket`, and `search_tickets`. It uses a Freshdesk API key, handles pagination and rate limits, and returns selected ticket fields. The connector's HTTP client sends only GET requests.
 
-## Prerequisites and setup
+## Set up
 
-- Node.js 18+ (ES modules).
-- A Freshdesk trial: your subdomain (`acme` for `https://acme.freshdesk.com`) and an API key (profile picture → Profile Settings → View API Key).
+You need Node.js 18 or newer, a Freshdesk account with API access, its subdomain, and an API key with permission to read tickets.
 
 ```bash
 cd freshdesk-connector
 npm install
-cp .env.example .env   # Windows: copy .env.example .env
-# then set FRESHDESK_DOMAIN and FRESHDESK_API_KEY
+cp .env.example .env
 ```
 
-`.env` is git-ignored. Commit `.env.example` only.
+On Windows, use `copy .env.example .env`. Add `FRESHDESK_DOMAIN` and `FRESHDESK_API_KEY` to `.env`. For `https://acme.freshdesk.com`, the domain value is `acme`. The server reports a missing variable by name without printing its value. Git ignores `.env`; do not submit it.
 
-## Environment variables
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `FRESHDESK_DOMAIN` | Yes | None | Freshdesk subdomain |
+| `FRESHDESK_API_KEY` | Yes | None | API key |
+| `FRESHDESK_BASE_URL` | No | `https://{domain}.freshdesk.com/api/v2` | Local mock override |
+| `REQUEST_TIMEOUT_MS` | No | `10000` | Timeout per HTTP request |
+| `MAX_RETRIES` | No | `4` | Additional attempts after a retryable failure |
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `FRESHDESK_DOMAIN` | yes | — | Subdomain only (`acme`, not `acme.freshdesk.com`) |
-| `FRESHDESK_API_KEY` | yes | — | Key from Profile Settings → View API Key |
-| `FRESHDESK_BASE_URL` | no | `https://{domain}.freshdesk.com/api/v2` | Override for tests / local mock |
-| `REQUEST_TIMEOUT_MS` | no | `10000` | Per-request timeout (abort + `TIMEOUT`) |
-| `MAX_RETRIES` | no | `4` | Retries for 429 / 502 / 503 / 504 / network errors |
-
-Missing `FRESHDESK_DOMAIN` / `FRESHDESK_API_KEY` exits with an error naming the variable (never the secret).
-
-## How to run
+## Run and test
 
 ```bash
-npm test          # node --test; uses the local mock server, no real credentials needed
-npm start         # MCP server over stdio
-npm run seed      # creates 12 fictional tickets in your trial (the only writer)
-npm run demo -- --mock   # full demo against the mock, incl. a 429 retry
-npm run demo      # same script against your real trial (needs .env)
-npm run tools:sync  # regenerate tools.json from src/tools.js
+npm test                 # Local mock only; no Freshdesk credentials needed
+npm start                # Start the MCP server over stdio
+npm run demo -- --mock   # Show list, search, get, and a 429 retry locally
+npm run demo             # Run the read-only demo against your Freshdesk account
+npm run seed             # Optional: create 12 fictional tickets in your trial account
+npm run tools:sync       # Regenerate tools.json from src/tools.js
 ```
 
-## Register with an MCP client
+`npm run seed` is the only script that writes to Freshdesk. It is separate from the MCP server and is optional. The server and demo read tickets.
+
+To inspect the MCP tools interactively, run `npx @modelcontextprotocol/inspector node src/server.js` with `.env` configured. The local demo works without a Freshdesk account.
+
+## Connect an agent
+
+Register the stdio server with an MCP client. Set the path to this checkout and supply the key through the client's secret store.
 
 ```json
 {
@@ -49,89 +49,56 @@ npm run tools:sync  # regenerate tools.json from src/tools.js
       "args": ["C:/path/to/freshdesk-connector/src/server.js"],
       "env": {
         "FRESHDESK_DOMAIN": "acme",
-        "FRESHDESK_API_KEY": "<set in your secret store, never in chat>"
+        "FRESHDESK_API_KEY": "<secret-store reference>"
       }
     }
   }
 }
 ```
 
-For Agent Studio, keep the same shape but reference your secret store for `FRESHDESK_API_KEY`. All logs go to stderr so stdout stays clean for MCP framing.
+This is a generic MCP client example. Agent Studio needs an MCP connection that can launch a stdio server or an equivalent deployment adapter; this repository does not include an Agent Studio-specific adapter. Server diagnostics go to stderr so stdout stays available for MCP messages.
 
-## Inspect interactively
-
-```bash
-npx @modelcontextprotocol/inspector node src/server.js
+```text
+Agent -> MCP server (src/server.js) -> ticket tools (src/tools.js)
+      -> GET-only client (src/freshdeskClient.js) -> Freshdesk API v2
 ```
 
-Open the printed URL, pick `list_tickets` / `get_ticket` / `search_tickets`, and call them. Needs `.env` with real credentials, or point `FRESHDESK_BASE_URL` at the mock via `npm run demo -- --mock` for an offline walkthrough.
+See [the tool specification](docs/TOOL_SPEC.md) for inputs and outputs and [the capabilities document](CAPABILITIES.md) for access limits.
 
-## Error catalog
+## API behavior and design
 
-## Error catalog
+The implementation follows the [Freshdesk API documentation](https://developers.freshdesk.com/api/). The project notes also record spot checks against a trial account for the `include` behavior below. A complete live demo of this Node.js connector is still outstanding.
 
-Tool handlers never return stack traces. Client error codes (`src/freshdeskClient.js`) map to short MCP messages (`src/tools.js`):
+- The API base URL is `https://{domain}.freshdesk.com/api/v2`. Authentication uses HTTP Basic with the API key as the username and `X` as the password.
+- `GET /tickets` accepts `page` and `per_page` up to 100. The client requests `include=description`. `list_tickets` filters status and priority *after* fetching one page, so a filtered page can be short or empty while `has_more` is true. Use `search_tickets` for server-side filtering.
+- `GET /tickets/{id}` fetches one ticket. The client requests `include=conversations` and falls back to `GET /tickets/{id}/conversations` if needed. The project notes say a trial account rejected the combined value `include=conversations,description`, while the ticket response already included its description.
+- `GET /search/tickets` accepts the connector's validated query. Freshdesk search returns at most 30 results per page and 10 pages. The connector reports `has_more` from the response total, within that limit.
+- Freshdesk ticket status codes 2, 3, 4, and 5 map to open, pending, resolved, and closed. Priority codes 1 through 4 map to low, medium, high, and urgent.
+- A 429 response triggers a retry after `Retry-After` seconds, capped at 60 seconds per wait. Without that header, the client uses exponential backoff. It also retries 502, 503, 504, and network errors. It does not retry 401, 403, or 404.
 
-| Code | Trigger | Agent-facing message |
-|---|---|---|
-| `AUTH_FAILED` | 401 / 403 | Authentication failed. Check FRESHDESK_API_KEY and FRESHDESK_DOMAIN. |
-| `NOT_FOUND` | 404 | Ticket not found. |
-| `RATE_LIMITED` | 429 retries exhausted | Rate limited. Retry after N seconds. |
-| `TIMEOUT` | Abort after `REQUEST_TIMEOUT_MS` | Freshdesk request timed out. Try again shortly. |
-| `INVALID_INPUT` | Bad page/per_page, bad ticket_id, bad filter | The specific validation message. |
-| `UPSTREAM_ERROR` | Other 4xx, 5xx exhausted, network down | Freshdesk is temporarily unavailable. Try again shortly. |
+The client hard-codes GET, and a test checks the methods received by the mock server. Tool responses select ticket fields and omit requester contact fields. Email and phone masking in description and conversation text is pattern-based; it does not guarantee removal of all personal data. The mock server makes retry and timeout tests repeatable without a Freshdesk account.
 
-Zod validation failures return `Invalid input: <path>: <reason>` the same way.
+## Errors
 
-## Flow
+Tools return short messages without stack traces.
 
-```
-Agent (Agent Studio) --tool call--> MCP server (src/server.js, stdio)
-                                          |
-                                    tools.js (validate + map)
-                                          |
-                              freshdeskClient.js (GET only, auth, retry)
-                                          |
-                                    Freshdesk API v2
-```
+| Code | Cause | Agent-facing result |
+| --- | --- | --- |
+| `AUTH_FAILED` | HTTP 401 or 403 | Check the API key, domain, and ticket permissions. |
+| `NOT_FOUND` | HTTP 404 | Ticket not found. |
+| `RATE_LIMITED` | 429 after all retries | Retry after the reported number of seconds. |
+| `TIMEOUT` | Request exceeds `REQUEST_TIMEOUT_MS` | Try again shortly. |
+| `INVALID_INPUT` | Invalid ticket ID, page, or filter | Correct the reported input. |
+| `UPSTREAM_ERROR` | Other HTTP error or exhausted retries | Try again shortly. |
 
-## Verified API details
+## Assumptions and limits
 
-Checked against https://developers.freshdesk.com/api/ (Oct 2026). Followed the docs where they differ from memory:
+One server instance connects to one Freshdesk account. The key must have ticket read access. The account's API allowance is shared with its other API consumers. Plan-specific access and rate limits need checking against the account used for deployment.
 
-- Base URL `https://{domain}.freshdesk.com/api/v2` — confirmed.
-- Auth is HTTP Basic with the API key as username and any password (`X`) — confirmed. Base64-encode `key:X`.
-- `GET /tickets` with `page` (from 1) and `per_page` (default 30, max 100) — confirmed. A `Link` header with `rel="next"` marks more pages; otherwise a full page implies more data. **Difference:** the list endpoint has no server-side `status`/`priority` filter, so `list_tickets` accepts those words but applies them client-side after fetching the page. Server-side filtering belongs in `search_tickets`.
-- `GET /tickets/{id}` for one ticket — confirmed. `?include=conversations` embeds the thread; `GET /tickets/{id}/conversations` is the fallback. Both are GET. Verified live: the view response carries the description by default, but a combined `include=conversations,description` is rejected (HTTP 400), so the client sends `include=conversations` only.
-- List responses omit descriptions unless requested: the client sends `include=description` on `GET /tickets` so `description_preview` is populated. Verified live on a trial account.
-- `GET /search/tickets?query="..."` with the query wrapped in double quotes and clauses like `status:2 AND priority:3` — confirmed. Search pages are 30/page, max 10 pages (300 results). Our `hasMore` uses `page * 30 < total`.
-- Status codes 2 open, 3 pending, 4 resolved, 5 closed; priority 1 low, 2 medium, 3 high, 4 urgent — confirmed.
-- Rate limiting: HTTP 429 with a `Retry-After` (seconds) header, plus `X-Ratelimit-Total/Remaining` on normal responses — confirmed. Trial default is ~50 calls/minute. We honor `Retry-After` capped at 60s, else exponential backoff from 1s with jitter, up to `MAX_RETRIES` (default 4).
-- Whether the plan includes API access: trial accounts include API access; agents need read permission on tickets or the API returns 403, which we surface as `AUTH_FAILED` without retrying.
+This connector cannot create or change tickets, read attachments or contact records, or run keyword search. Search is limited to 300 results per query; `get_ticket` returns at most five conversation entries. There is no cache, webhook listener, or per-agent audit log. See [CAPABILITIES.md](CAPABILITIES.md) for the full list.
 
-## Design decisions
+Local mock tests cover the client and tool handlers. This checkout has no recorded end-to-end Agent Studio run or full live Freshdesk demo of the Node.js connector. Run `npm run demo` and an MCP client session with a trial account before claiming those checks in a submission.
 
-- **Why read-only:** there is no POST/PUT/PATCH/DELETE code path in `src/`. The private `#request()` hard-codes `method: 'GET'`, and a test asserts the mock only ever sees GET. A prompt-injected agent cannot write because the capability does not exist.
-- **Why API key, not OAuth:** Freshdesk's agent API uses per-account API keys; OAuth per-merchant would be better (see CAPABILITIES.md) but is out of scope for this take-home and would add account-coupling complexity.
-- **Why trimmed output:** raw tickets carry requester emails, phones, and HTML bodies the agent does not need. `mappers.js` whitelists fields and masks email/phone patterns in free text, keeping payloads small and PII out of the model context.
-- **Why a mock server in tests:** `test/mockFreshdesk.js` is a controllable `node:http` server (normal page, last page, 404, 401, one-shot and permanent 429, one-shot 503, slow response). Tests run offline with `npm test` from a fresh clone and assert timing, retry counts, and header construction deterministically. No axios/jest/nock — built-in `fetch` and `node:test` only.
+## Relationship to DeskBridge
 
-## Assumptions and limitations
-
-Assumptions:
-- Node.js 18+ with network access to `*.freshdesk.com` over HTTPS.
-- One Freshdesk account per server instance (single domain + API key).
-- The API key belongs to an agent/admin with read permission on tickets (otherwise 403 → `AUTH_FAILED`).
-- Trial accounts include API access at ~50 calls/minute; plan limits are shared with all other API consumers on the account.
-
-Limitations (full list in `CAPABILITIES.md`): read-only (no create/reply/update/delete), no contacts/companies/attachments, no free-text search, max 300 search results per query, max 5 conversation entries per ticket, pattern-based (not guaranteed) PII masking, no caching, no webhooks (reads may lag writes by seconds to minutes), shared-key auth instead of per-merchant OAuth.
-
-## Unverified / not finished
-
-- No live Freshdesk trial run: seed (`npm run seed`) and real-account demo need your credentials; only mock + docs verified so far.
-- No interactive MCP Inspector session, only stdio boot + handler tests.
-- Merchant plan API access assumed per docs (trials include API; 403 surfaces as `AUTH_FAILED`).
-
-## What is missing vs the Python DeskBridge
-
-Deliberately small deltas: this connector adds strict per-brief contract items the Python version lacks (GET-only enforcement test, `tools.json` sync test, `status_code`/`priority_code` fields, `description_preview` 300-char shape, `REQUEST_TIMEOUT_MS`/`MAX_RETRIES` env names) and drops Python-only extras (PII toggle env, `updated_since`/`requester_id` list filters) to stay exactly on the brief. See CAPABILITIES.md for limits and the production path.
+DeskBridge is a separate Python implementation used as a reference. This Node.js project adds the GET-only method test, a `tools.json` sync test, and the output and configuration fields listed in the build brief. Submit one clearly identified project for the Freshdesk connector task.
