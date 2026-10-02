@@ -83,7 +83,7 @@ describe('tools', () => {
 
   it('query builder AND-combines validated fields and wraps in quotes', () => {
     const q = buildSearchQuery({ status: 'open', priority: 'high', tag: 'refund', created_after: '2026-01-01' });
-    assert.equal(q, '"status:2 AND priority:3 AND tag:\'refund\' AND created_at>\'2026-01-01\'"');
+    assert.equal(q, '"status:2 AND priority:3 AND tag:\'refund\' AND created_at:>\'2026-01-01\'"');
   });
 
   it('docs/TOOL_SPEC.md covers every tool in the spec', () => {

@@ -84,9 +84,9 @@ See [the tool specification](docs/TOOL_SPEC.md) for inputs and outputs and [the 
 The implementation follows the [Freshdesk API documentation](https://developers.freshdesk.com/api/). The project notes also record spot checks against a trial account for the `include` behavior below. A complete live demo of this Node.js connector is still outstanding.
 
 - The API base URL is `https://{domain}.freshdesk.com/api/v2`. Authentication uses HTTP Basic with the API key as the username and `X` as the password.
-- `GET /tickets` accepts `page` and `per_page` up to 100. The client requests `include=description`. `list_tickets` filters status and priority *after* fetching one page, so a filtered page can be short or empty while `has_more` is true. Use `search_tickets` for server-side filtering.
+- `GET /tickets` accepts `page` and `per_page` up to 100, with a 300-page API limit. The client requests `include=description`. By default, Freshdesk lists tickets created within the last 30 days; this connector does not expose `updated_since` for older tickets. `list_tickets` filters status and priority *after* fetching one page, so a filtered page can be short or empty while `has_more` is true. Use `search_tickets` for server-side filtering.
 - `GET /tickets/{id}` fetches one ticket. The client requests `include=conversations` and falls back to `GET /tickets/{id}/conversations` if needed. The project notes say a trial account rejected the combined value `include=conversations,description`, while the ticket response already included its description.
-- `GET /search/tickets` accepts the connector's validated query. Freshdesk search returns at most 30 results per page and 10 pages. The connector reports `has_more` from the response total, within that limit.
+- `GET /search/tickets` accepts the connector's validated query. Date comparisons use Freshdesk's `created_at:>'YYYY-MM-DD'` syntax. Freshdesk search returns at most 30 results per page and 10 pages. The connector reports `has_more` from the response total, within that limit. Search updates may take a few minutes to appear in Freshdesk's index.
 - Freshdesk ticket status codes 2, 3, 4, and 5 map to open, pending, resolved, and closed. Priority codes 1 through 4 map to low, medium, high, and urgent.
 - A 429 response triggers a retry after `Retry-After` seconds, capped at 60 seconds per wait. Without that header, the client uses exponential backoff. It also retries 502, 503, 504, and network errors. It does not retry 401, 403, or 404.
 
@@ -109,6 +109,6 @@ Tools return short messages without stack traces.
 
 One server instance connects to one Freshdesk account. The key must have ticket read access. The account's API allowance is shared with its other API consumers. Plan-specific access and rate limits need checking against the account used for deployment.
 
-This connector cannot create or change tickets, read attachments or contact records, or run keyword search. Search is limited to 300 results per query; `get_ticket` returns at most five conversation entries. There is no cache, webhook listener, or per-agent audit log. See [CAPABILITIES.md](CAPABILITIES.md) for the full list.
+This connector cannot create or change tickets, read attachments or contact records, or run keyword search. The list tool does not expose older tickets by default. Search is limited to 300 results per query; `get_ticket` returns at most five conversation entries. There is no cache, webhook listener, or per-agent audit log. See [CAPABILITIES.md](CAPABILITIES.md) for the full list.
 
 Local mock tests cover the client and tool handlers. This checkout has no recorded end-to-end Agent Studio run or full live Freshdesk demo of the Node.js connector. Run `npm run demo` and an MCP client session with a trial account before claiming those checks in a submission.

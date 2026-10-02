@@ -2,7 +2,7 @@
 
 The MCP server connects to one Freshdesk account with one API key. Its three tools read tickets:
 
-- `list_tickets` returns one page of recent tickets. `status` and `priority` filter that fetched page locally, so a short or empty result does not mean there are no matches on later pages.
+- `list_tickets` returns one page of tickets. Freshdesk limits the default list to tickets created within the last 30 days and at most 300 pages. This tool does not expose `updated_since`. `status` and `priority` filter that fetched page locally, so a short or empty result does not mean there are no matches on later pages.
 - `get_ticket` returns one ticket by ID and up to the last five conversation entries returned by Freshdesk. The connector does not sort them by time. Each conversation body is truncated after 500 characters, with a truncation marker added.
 - `search_tickets` combines the supplied status, priority, exact tag, and creation-date filters. At least one filter is required. Freshdesk search allows at most 10 pages of 30 results.
 
@@ -22,7 +22,9 @@ Do not treat the output as free of personal data. Subject and tags are returned 
 
 The key is shared by all calls to this server. Other API consumers on the same Freshdesk account also use its rate-limit allowance. The client retries 429 responses using `Retry-After` when present, with each wait capped at 60 seconds. It stops after `MAX_RETRIES` additional attempts and returns `RATE_LIMITED` if the limit persists.
 
-Every tool call reads Freshdesk directly. There is no cache or webhook listener. Freshdesk search stops at page 10, and the connector does not maintain a local search index. Conversation fetching is best effort: a retryable failure can leave a successful ticket response without conversations.
+Successful tool calls read Freshdesk directly. There is no cache or webhook listener. Freshdesk search stops at page 10, and search updates may take a few minutes to appear in its index. The connector does not maintain a local search index. For `list_tickets`, `has_more` is based on whether the fetched page is full, so a full final page can report `true`. Conversation fetching is best effort: a retryable failure can leave a successful ticket response without conversations.
+
+This repository includes a generic MCP server, but no Agent Studio-specific adapter or recorded end-to-end Agent Studio test.
 
 ## Security and future work
 

@@ -1,6 +1,6 @@
 # MCP tool specification
 
-The `freshdesk-connector` server exposes three read-only tools over stdio. `src/tools.js` defines their Zod input schemas and JSON specifications. Run `npm run tools:sync` to regenerate `tools.json`; a test checks that the files agree. This document describes their behavior.
+The `freshdesk-connector` server exposes three read-only tools over stdio. `src/tools.js` defines their Zod input schemas and JSON specifications. Run `npm run tools:sync` to regenerate `tools.json`; a test checks tool names, descriptions, input schemas, and the presence of examples. This document describes their behavior.
 
 ## Shared types
 
@@ -32,7 +32,7 @@ The mapper omits requester contact fields. It returns subject and tags without m
 
 ## Tool: `list_tickets`
 
-List one page of tickets. The connector applies `status` and `priority` after fetching the page. Use `search_tickets` when those filters need to run on Freshdesk.
+List one page of tickets. Freshdesk returns tickets created within the last 30 days by default, up to 300 pages. This tool does not expose `updated_since`. The connector applies `status` and `priority` after fetching the page. Use `search_tickets` when those filters need to run on Freshdesk.
 
 Input schema (`tools.json#/tools/list_tickets/inputSchema`):
 
@@ -52,7 +52,7 @@ Output: `{ "items": Ticket[], "page": 1, "has_more": true }`.
 
 Example call: `{ "status": "open", "priority": "urgent", "page": 1, "per_page": 20 }`.
 
-A filtered page may be short or empty even when `has_more` is true, because later Freshdesk pages may contain matches.
+A filtered page may be short or empty even when `has_more` is true, because later Freshdesk pages may contain matches. The client marks any full raw page as `has_more: true`, so a full final page can also report `true`.
 
 ## Tool: `get_ticket`
 
@@ -76,7 +76,7 @@ The tool does not return attachments. If a retryable error prevents the separate
 
 ## Tool: `search_tickets`
 
-The connector combines field filters with `AND` in a Freshdesk `query="..."` string. The agent cannot supply a raw query.
+The connector combines field filters with `AND` in a Freshdesk `query="..."` string. For example, `created_after` becomes `created_at:>'YYYY-MM-DD'`. The agent cannot supply a raw query.
 
 Input schema:
 
@@ -97,7 +97,7 @@ At least one filter is required. Output: `{ "items": Ticket[], "page": 1, "has_m
 
 Example call: `{ "status": "open", "tag": "refund", "page": 1 }`. The connector builds `"status:2 AND tag:'refund'"`.
 
-Search returns at most 30 results per page and 10 pages. Tag matching is exact. The tool does not support keyword search.
+Search returns at most 30 results per page and 10 pages. Tag matching is exact. Freshdesk may take a few minutes to index ticket updates. The tool does not support keyword search.
 
 ## Errors
 
@@ -110,4 +110,4 @@ npm run tools:sync
 npm test
 ```
 
-The test fails if `tools.json` differs from `TOOL_SPECS`.
+The test fails if tool names, descriptions, input schemas, or example presence drift from `TOOL_SPECS`.

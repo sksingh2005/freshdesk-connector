@@ -39,7 +39,7 @@ export function buildSearchQuery({ status, priority, tag, created_after } = {}) 
     if (!DATE_RE.test(d)) {
       throw new FreshdeskError('INVALID_INPUT', `created_after must be YYYY-MM-DD. Got "${created_after}".`);
     }
-    parts.push(`created_at>'${d}'`);
+    parts.push(`created_at:>'${d}'`);
   }
   if (parts.length === 0) {
     throw new FreshdeskError('INVALID_INPUT', 'Provide at least one filter: status, priority, tag, or created_after.');
