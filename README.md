@@ -2,6 +2,20 @@
 
 This read-only MCP server gives an agent three Freshdesk ticket tools: `list_tickets`, `get_ticket`, and `search_tickets`. It uses a Freshdesk API key, handles pagination and rate limits, and returns selected ticket fields. The connector's HTTP client sends only GET requests.
 
+## Screenshots
+
+The Freshdesk view shows a fictional ticket in a trial account, filtered by its `refund` tag. It shows the source record; the MCP screenshots below use the local mock and do not claim a live connector run.
+
+![Freshdesk ticket list filtered to a fictional refund ticket](docs/assets/freshdesk-fictional-ticket.jpg)
+
+MCP Inspector connected to this Node server and listing its three tools:
+
+![MCP Inspector showing the connector's list, get, and search tools](docs/assets/mcp-tools.jpg)
+
+`get_ticket` returning fictional ticket 101 through the MCP server and local mock:
+
+![MCP Inspector showing a successful get_ticket result with fictional data](docs/assets/mcp-get-ticket.jpg)
+
 ## Set up
 
 You need Node.js 18 or newer, a Freshdesk account with API access, its subdomain, and an API key with permission to read tickets. In Freshdesk, open your profile settings and select **View API Key** to find the key.
@@ -35,7 +49,7 @@ npm run tools:sync       # Regenerate tools.json from src/tools.js
 
 `npm run seed` is the only script that writes to Freshdesk. It is separate from the MCP server and is optional. The server and demo read tickets.
 
-To inspect the MCP tools interactively, run `npx @modelcontextprotocol/inspector node src/server.js` with `.env` configured. The local demo works without a Freshdesk account.
+To inspect the MCP tools with fictional data and no Freshdesk credentials, run `npx @modelcontextprotocol/inspector node scripts/inspector-mock.js`. The helper starts a local mock and points the same MCP server at it. To inspect a live account instead, run `npx @modelcontextprotocol/inspector node src/server.js` with `.env` configured.
 
 ## Connect an agent
 
